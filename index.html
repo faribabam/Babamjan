@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEON SURGE // Arcade Breakout</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-cyan: #00f3ff;
+            --neon-pink: #ff0055;
+            --neon-purple: #9d00ff;
+            --neon-green: #00ff66;
+            --neon-yellow: #ffb700;
+            --bg-dark: #0a0a12;
+            --panel-bg: rgba(16, 16, 28, 0.75);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: #ffffff;
+            font-family: 'Rajdhani', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(26, 21, 44, 0.5) 0%, transparent 80%),
+                linear-gradient(rgba(18, 16, 26, 0.8) 2px, transparent 2px),
+                linear-gradient(90deg, rgba(18, 16, 26, 0.8) 2px, transparent 2px);
+            background-size: 100% 100%, 30px 30px, 30px 30px;
+            background-position: center;
+        }
+
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background: rgba(5, 5, 10, 0.85);
+            border: 2px solid rgba(0, 243, 255, 0.2);
+            border-radius: 12px;
+            box-shadow: 0 0 40px rgba(0, 243, 255, 0.1), inset 0 0 20px rgba(157, 0, 255, 0.1);
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Overlays */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(6, 6, 10, 0.9);
+            backdrop-filter: blur(8px);
+            z-index: 10;
+            transition: opacity 0.4s ease, visibility 0.4s ease;
+        }
+
+        .overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        /* Typography & Components */
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 4rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 6px;
+            margin-bottom: 10px;
+            color: #fff;
+            text-shadow: 0 0 10px var(--neon-cyan), 0 0 30px var(--neon-purple);
+            animation: pulse Gpu 3s infinite alternate;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: rgba(255, 255, 255, 0.6);
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            margin-bottom: 40px;
+        }
+
+        .menu-btn {
+            font-family: 'Orbitron', sans-serif;
+            background: transparent;
+            color: #fff;
+            border: 2px solid var(--neon-cyan);
+            padding: 14px 40px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            cursor: pointer;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+        }
+
+        .menu-btn:hover {
+            background: var(--neon-cyan);
+            color: var(--bg-dark);
+            box-shadow: 0 0 30px var(--neon-cyan);
+            transform: translateY(-2px);
+        }
+
+        .menu-btn:active {
+            transform: translateY(1px);
+        }
+
+        /* HUD Styling */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+            font-family: 'Orbitron', sans-serif;
+            z-index: 5;
+        }
+
+        .hud-element {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .hud-label {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.4);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        .hud-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+
+        .hud-value.cyan { color: var(--neon-cyan); text-shadow: 0 0 10px rgba(0, 243, 255, 0.5); }
+        .hud-value.pink { color: var(--neon-pink); text-shadow: 0 0 10px rgba(255, 0, 85, 0.5); }
+        .hud-value.purple { color: var(--neon-purple); text-shadow: 0 0 10px rgba(157, 0, 255, 0.5); }
+
+        /* Instructions Info */
+        .instructions {
+            background: var(--panel-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 25px;
+            border-radius: 8px;
+            max-width: 450px;
+            text-align: center;
+            margin-bottom: 40px;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
+        }
+
+        .instructions p {
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+            color: rgba(255, 255, 255, 0.8);
+            letter-spacing: 1px;
+        }
+        .instructions p:last-child { margin-bottom: 0; }
+
+        .highlight {
+            color: var(--neon-cyan);
+            font-weight: 700;
+        }
+        .highlight-pink {
+            color: var(--neon-pink);
+            font-weight: 700;
+        }
+
+        /* Game Over Specifics */
+        #game-over-screen h1 {
+            color: var(--neon-pink);
+            text-shadow: 0 0 10px var(--neon-pink), 0 0 30px var(--neon-purple);
+        }
+        #game-over-screen .menu-btn {
+            border-color: var(--neon-pink);
+            box-shadow: 0 0 15px rgba(255, 0, 85, 0.2);
+        }
+        #game-over-screen .menu-btn:hover {
+            background: var(--neon-pink);
+            box-shadow: 0 0 30px var(--neon-pink);
+            color: var(--bg-dark);
+        }
+        .final-stats {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 40px;
+            background: var(--panel-bg);
+            padding: 20px 40px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .stat-box {
+            text-align: center;
+        }
+        .stat-box .hud-value {
+            font-size: 2.5rem;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.9; text-shadow: 0 0 10px var(--neon-cyan), 0 0 20px var(--neon-purple); }
+            100% { opacity: 1; text-shadow: 0 0 15px var(--neon-cyan), 0 0 35px var(--neon-cyan), 0 0 50px var(--neon-purple); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="hud">
+            <div class="hud-element">
+                <span class="hud-label">Score</span>
+                <span id="score-display" class="hud-value cyan">00000</span>
+            </div>
+            <div class="hud-element" style="text-align: center;">
+                <span class="hud-label">Multiplier</span>
+                <span id="multiplier-display" class="hud-value purple">x1.0</span>
+            </div>
+            <div class="hud-element" style="text-align: right;">
+                <span class="hud-label">Energy Cores</span>
+                <span id="lives-display" class="hud-value pink">|||</span>
+            </div>
+        </div>
+
+        <div id="start-screen" class="overlay">
+            <h1>NEON SURGE</h1>
+            <div class="subtitle">Tactical Grid Breaker</div>
+            <div class="instructions">
+                <p><span class="highlight">MOUSE / TOUCH</span> &rarr; Shift Deflector Platform</p>
+                <p><span class="highlight">CLICK</span> &rarr; Inject Initialization Pulse</p>
+                <p>Intercept matrix nodes to secure <span class="highlight-pink">Power Mods</span></p>
+                <p>Maintain continuous momentum to surge your multiplier</p>
+            </div>
+            <button id="start-btn" class="menu-btn">Initialize System</button>
+        </div>
+
+        <div id="game-over-screen" class="overlay hidden">
+            <h1>SYSTEM OVERRIDE</h1>
+            <div class="subtitle">Grid Connection Severed</div>
+            <div class="final-stats">
+                <div class="stat-box">
+                    <div class="hud-label">Final Score</div>
+                    <div id="final-score" class="hud-value cyan">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="hud-label">Max Stage</div>
+                    <div id="final-level" class="hud-value purple">1</div>
+                </div>
+            </div>
+            <button id="restart-btn" class="menu-btn">Reboot Sequence</button>
+        </div>
+
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // DOM elements
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const scoreDisplay = document.getElementById('score-display');
+        const multiplierDisplay = document.getElementById('multiplier-display');
+        const livesDisplay = document.getElementById('lives-display');
+        const finalScore = document.getElementById('final-score');
+        const finalLevel = document.getElementById('final-level');
+
+        // Design Palette Constants
+        const COLORS = {
+            cyan: '#00f3ff',
+            pink: '#ff0055',
+            purple: '#9d00ff',
+            green: '#00ff66',
+            yellow: '#ffb700',
+            white: '#ffffff',
+            brickGlows: ['#ff0055', '#9d00ff', '#00f3ff', '#00ff66', '#ffb700']
+        };
+
+        // Game Configuration & Engine State
+        let state = 'START'; // START, PLAYING, GAMEOVER
+        let score = 0;
+        let baseMultiplier = 1;
+        let currentMultiplier = 1;
+        let multiplierTimer = 0;
+        let lives = 3;
+        let currentLevel = 1;
+        let screenShake = 0;
+
+        // Interactive Entity Declarations
+        let paddle, balls, bricks, particles, powerUps, lasers;
+
+        // Controls Map
+        const mouse = { x: 400, y: 0 };
+        let isBallAnchored = true;
+
+        // Custom Utility Formulas
+        const randRange = (min, max) => Math.random() * (max - min) + min;
+        const padZero = (num, size) => ('000000' + num).substr(-size);
+
+        // System Classes
+        class Paddle {
+            constructor() {
+                this.width = 120;
+                this.height = 14;
+                this.x = canvas.width / 2 - this.width / 2;
+                this.y = canvas.height - 40;
+                this.targetWidth = 120;
+                this.laserMode = false;
+                this.laserTimer = 0;
+            }
+
+            update() {
+                // Smoothly slide toward user interaction position
+                this.x += (mouse.x - (this.x + this.width / 2)) * 0.25;
+                // Bound check constraints
+                if (this.x < 0) this.x = 0;
+                if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
+
+                // Handle dynamic morphing modifiers
+                if (this.width !== this.targetWidth) {
+                    this.width += (this.targetWidth - this.width) * 0.1;
+                }
+
+                // Fire weapon subroutines if active
+                if (this.laserMode) {
+                    this.laserTimer--;
+                    if (this.laserTimer % 12 === 0) {
+                        lasers.push(new Laser(this.x + 10, this.y));
+                        lasers.push(new Laser(this.x + this.width - 10, this.y));
+                    }
+                    if (this.laserTimer <= 0) this.laserMode = false;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                // Outer structural glow effect
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.laserMode ? COLORS.pink : COLORS.cyan;
+                
+                // Segmented futuristic render pipeline
+                let fillGrad = ctx.createLinearGradient(this.x, this.y, this.x + this.width, this.y);
+                fillGrad.addColorStop(0, this.laserMode ? COLORS.pink : COLORS.purple);
+                fillGrad.addColorStop(0.5, COLORS.cyan);
+                fillGrad.addColorStop(1, this.laserMode ? COLORS.pink : COLORS.purple);
+
+                ctx.fillStyle = fillGrad;
+                ctx.beginPath();
+                ctx.roundRect(this.x, this.y, this.width, this.height, 4);
+                ctx.fill();
+
+                // Core metallic overlay accent line
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = COLORS.white;
+                ctx.fillRect(this.x + this.width / 2 - 15, this.y + 2, 30, 3);
+                ctx.restore();
+            }
+        }
+
+        class Ball {
+            constructor(x, y) {
+                this.radius = 7;
+                this.reset(x, y);
+            }
+
+            reset(x, y) {
+                this.x = x || canvas.width / 2;
+                this.y = y || (canvas.height - 54);
+                this.vx = 0;
+                this.vy = 0;
+                this.speed = 7 + currentLevel * 0.5;
+                this.history = [];
+            }
+
+            launch() {
+                this.vx = randRange(-4, 4);
+                this.vy = -this.speed;
+                isBallAnchored = false;
+            }
+
+            update() {
+                if (isBallAnchored) {
+                    this.x = paddle.x + paddle.width / 2;
+                    this.y = paddle.y - this.radius;
+                    return;
+                }
+
+                // Track rendering vector histories for kinematics trails
+                this.history.push({ x: this.x, y: this.y });
+                if (this.history.length > 8) this.history.shift();
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Physics Engine boundaries logic
+                if (this.x - this.radius < 0) {
+                    this.x = this.radius;
+                    this.vx *= -1;
+                    triggerImpactParticles(this.x, this.y, COLORS.cyan);
+                }
+                if (this.x + this.radius > canvas.width) {
+                    this.x = canvas.width - this.radius;
+                    this.vx *= -1;
+                    triggerImpactParticles(this.x, this.y, COLORS.cyan);
+                }
+                if (this.y - this.radius < 0) {
+                    this.y = this.radius;
+                    this.vy *= -1;
+                    triggerImpactParticles(this.x, this.y, COLORS.cyan);
+                    screenShake = Math.max(screenShake, 4);
+                }
+
+                // Collide with core interface board (Paddle)
+                if (this.vy > 0 && 
+                    this.x + this.radius >= paddle.x && 
+                    this.x - this.radius <= paddle.x + paddle.width && 
+                    this.y + this.radius >= paddle.y && 
+                    this.y - this.radius <= paddle.y + paddle.height) {
+                    
+                    this.y = paddle.y - this.radius;
+                    // Calculate relative deflection angle base offset
+                    let hitPoint = (this.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+                    let angle = hitPoint * (Math.PI / 3); // max 60 degree angle deflection
+
+                    this.vx = this.speed * Math.sin(angle);
+                    this.vy = -this.speed * Math.cos(angle);
+                    
+                    // Cap horizontal speed loops
+                    if(Math.abs(this.vy) < 2) this.vy = -2;
+
+                    triggerImpactParticles(this.x, this.y, COLORS.cyan);
+                    resetMultiplierTimer();
+                    screenShake = Math.max(screenShake, 3);
+                }
+            }
+
+            draw() {
+                // Kinetic trail implementation
+                for (let i = 0; i < this.history.length; i++) {
+                    let pos = this.history[i];
+                    let alpha = (i + 1) / this.history.length * 0.25;
+                    ctx.fillStyle = `rgba(0, 243, 255, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, this.radius * (i/this.history.length), 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Ball geometric body
+                ctx.save();
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = COLORS.cyan;
+                ctx.fillStyle = COLORS.white;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class Brick {
+            constructor(x, y, w, h, type) {
+                this.x = x;
+                this.y = y;
+                this.w = w;
+                this.h = h;
+                this.type = type; // 1 to 4 strengths
+                this.maxHp = type;
+                this.hp = type;
+                this.color = COLORS.brickGlows[type - 1];
+                this.destroyed = false;
+            }
+
+            hit() {
+                this.hp--;
+                if (this.hp <= 0) {
+                    this.destroyed = true;
+                    score += 100 * this.maxHp * currentMultiplier;
+                    currentMultiplier += 0.1;
+                    updateHUD();
+                    spawnExplosion(this.x + this.w / 2, this.y + this.h / 2, this.color);
+                    
+                    // Evaluate global rng for procedural drop generation
+                    if (Math.random() < 0.25) {
+                        powerUps.push(new PowerUp(this.x + this.w / 2, this.y + this.h / 2));
+                    }
+                } else {
+                    score += 25 * currentMultiplier;
+                    updateHUD();
+                    this.color = COLORS.brickGlows[this.hp - 1];
+                    spawnExplosion(this.x + this.w / 2, this.y + this.h / 2, '#fff', 6);
+                }
+            }
+
+            draw() {
+                if (this.destroyed) return;
+
+                ctx.save();
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = this.color;
+                
+                // Translucent glow inner fill matrix
+                ctx.fillStyle = `rgba(${hexToRgb(this.color)}, ${0.15 + (this.hp / this.maxHp) * 0.2})`;
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 2;
+
+                ctx.beginPath();
+                ctx.roundRect(this.x + 2, this.y + 2, this.w - 4, this.h - 4, 3);
+                ctx.fill();
+                ctx.stroke();
+
+                // Decorative hardware sub-pip accents inside bricks
+                if (this.hp > 1) {
+                    ctx.shadowBlur = 0;
+                    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                    for(let i=0; i<this.hp-1; i++) {
+                        ctx.fillRect(this.x + 8 + (i * 6), this.y + this.h - 8, 3, 3);
+                    }
+                }
+                ctx.restore();
+            }
+        }
+
+        class Laser {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vy = -12;
+                this.w = 3;
+                this.h = 14;
+            }
+            update() {
+                this.y += this.vy;
+            }
+            draw() {
+                ctx.save();
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = COLORS.pink;
+                ctx.fillStyle = COLORS.pink;
+                ctx.fillRect(this.x, this.y, this.w, this.h);
+                ctx.restore();
+            }
+        }
+
+        class PowerUp {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vy = 2.5;
+                this.radius = 12;
+                
+                // Randomized loadout definitions
+                const options = ['WIDE', 'MULTIBALL', 'LASER', 'SHIELD'];
+                this.type = options[Math.floor(Math.random() * options.length)];
+                
+                switch(this.type) {
+                    case 'WIDE': this.color = COLORS.cyan; break;
+                    case 'MULTIBALL': this.color = COLORS.green; break;
+                    case 'LASER': this.color = COLORS.pink; break;
+                    case 'SHIELD': this.color = COLORS.yellow; break;
+                }
+            }
+
+            update() {
+                this.y += this.vy;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+                
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 2;
+                ctx.fillStyle = 'rgba(10,10,18,0.8)';
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                // Icon signifier graphic markers
+                ctx.fillStyle = this.color;
+                ctx.font = 'bold 10px Orbitron';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.type[0], this.x, this.y);
+
+                ctx.restore();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.radius = randRange(1.5, 4);
+                let angle = randRange(0, Math.PI * 2);
+                let speed = randRange(1, 6);
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.alpha = 1;
+                this.decay = randRange(0.015, 0.03);
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.05; // light structural systemic gravity simulated
+                this.alpha -= this.decay;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // Color Converter Helper Routine
+        function hexToRgb(hex) {
+            let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '255,255,255';
+        }
+
+        // Dynamic System Generators
+        function generateGrid(level) {
+            bricks = [];
+            const rows = 4 + Math.min(level, 4);
+            const cols = 10;
+            const brickWidth = (canvas.width - 40) / cols;
+            const brickHeight = 24;
+            const yOffset = 70;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    // Algorithmic pattern configuration matrix variation based on stage layout
+                    let type = 1;
+                    if (r === 0) type = 4;
+                    else if (r < 2) type = 3;
+                    else if (r < 4) type = 2;
+
+                    // Random variance modifier deployment injectors
+                    if (Math.random() < 0.12 && level > 1) continue; // structural voids pattern holes
+
+                    let bx = 20 + c * brickWidth;
+                    let by = yOffset + r * brickHeight;
+                    bricks.push(new Brick(bx, by, brickWidth, brickHeight, type));
+                }
+            }
+        }
+
+        function triggerImpactParticles(x, y, color) {
+            for (let i = 0; i < 6; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function spawnExplosion(x, y, color, count = 16) {
+            screenShake = Math.max(screenShake, 5);
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function resetMultiplierTimer() {
+            multiplierTimer = 240; // timeframe steps before dropping multi values
+        }
+
+        // Systems Logic Operations Setup Processing Engine
+        function handlePowerUp(power) {
+            score += 200 * currentMultiplier;
+            switch(power.type) {
+                case 'WIDE':
+                    paddle.targetWidth = 180;
+                    setTimeout(() => paddle.targetWidth = 120, 10000);
+                    break;
+                case 'MULTIBALL':
+                    let bCount = balls.length;
+                    for(let i=0; i<bCount; i++) {
+                        if(balls[i]) {
+                            let b1 = new Ball(balls[i].x, balls[i].y);
+                            b1.vx = balls[i].vx + randRange(-2, 2);
+                            b1.vy = -Math.abs(balls[i].vy);
+                            b1.speed = balls[i].speed;
+                            isBallAnchored = false;
+                            balls.push(b1);
+                        }
+                    }
+                    break;
+                case 'LASER':
+                    paddle.laserMode = true;
+                    paddle.laserTimer += 400;
+                    break;
+                case 'SHIELD':
+                    // Immediate score dynamic bonus buffer injection
+                    score += 500;
+                    break;
+            }
+            updateHUD();
+            spawnExplosion(power.x, power.y, power.color, 10);
+        }
+
+        function initEngine() {
+            score = 0;
+            currentMultiplier = 1;
+            lives = 3;
+            currentLevel = 1;
+            
+            paddle = new Paddle();
+            balls = [new Ball()];
+            particles = [];
+            powerUps = [];
+            lasers = [];
+            isBallAnchored = true;
+
+            generateGrid(currentLevel);
+            updateHUD();
+        }
+
+        function advanceLevel() {
+            currentLevel++;
+            balls = [new Ball()];
+            isBallAnchored = true;
+            paddle.laserMode = false;
+            paddle.targetWidth = 120;
+            powerUps = [];
+            lasers = [];
+            generateGrid(currentLevel);
+            updateHUD();
+            
+            // Render stage victory flash burst
+            screenShake = 10;
+        }
+
+        function updateHUD() {
+            scoreDisplay.textContent = padZero(Math.floor(score), 5);
+            multiplierDisplay.textContent = `x${currentMultiplier.toFixed(1)}`;
+            
+            let livesStr = '';
+            for(let i=0; i<lives; i++) livesStr += '|';
+            livesDisplay.textContent = livesStr || 'EMPTY';
+        }
+
+        // Primary Structural Animation Frame Loop Controller
+        function loop() {
+            // Apply Canvas Global Space Screen Shake Offset Transpositions
+            ctx.save();
+            if (screenShake > 0) {
+                let dx = randRange(-screenShake, screenShake);
+                let dy = randRange(-screenShake, screenShake);
+                ctx.translate(dx, dy);
+                screenShake *= 0.9; // damp decay loop
+                if (screenShake < 0.2) screenShake = 0;
+            }
+
+            // Refresh frame backdrop target buffer matrix area
+            ctx.clearRect(-20, -20, canvas.width + 40, canvas.height + 40);
+
+            if (state === 'PLAYING') {
+                // Decay System Multiplier over processing timeframe ticks
+                if (currentMultiplier > 1) {
+                    multiplierTimer--;
+                    if (multiplierTimer <= 0) {
+                        currentMultiplier = Math.max(1, currentMultiplier - 0.2);
+                        resetMultiplierTimer();
+                        updateHUD();
+                    }
+                }
+
+                paddle.update();
+                
+                // Evaluate standard balls collection processing pipeline loop mechanics
+                for (let i = balls.length - 1; i >= 0; i--) {
+                    let ball = balls[i];
+                    ball.update();
+
+                    // Evaluate matrix intersection points for brick entities
+                    for (let j = bricks.length - 1; j >= 0; j--) {
+                        let brick = bricks[j];
+                        if (!brick.destroyed) {
+                            // Specialized bounding box circle check intercept approximation logic
+                            if (ball.x + ball.radius >= brick.x && 
+                                ball.x - ball.radius <= brick.x + brick.w && 
+                                ball.y + ball.radius >= brick.y && 
+                                ball.y - ball.radius <= brick.y + brick.h) {
+                                
+                                brick.hit();
+
+                                // Calculate impact trajectory refraction orientation inversion
+                                let prevX = ball.x - ball.vx;
+                                let prevY = ball.y - ball.vy;
+
+                                if (prevX + ball.radius <= brick.x || prevX - ball.radius >= brick.x + brick.w) {
+                                    ball.vx *= -1;
+                                } else {
+                                    ball.vy *= -1;
+                                }
+                                break; 
+                            }
+                        }
+                    }
+
+                    // Elimination routine for out-of-bound drops below grid frame bounds
+                    if (ball.y - ball.radius > canvas.height) {
+                        balls.splice(i, 1);
+                    }
+                }
+
+                // Laser processing pipeline routines loop execution checks
+                for(let i = lasers.length - 1; i >= 0; i--) {
+                    let l = lasers[i];
+                    l.update();
+                    
+                    let hit = false;
+                    for(let j = bricks.length - 1; j >= 0; j--) {
+                        let b = bricks[j];
+                        if(!b.destroyed && l.x >= b.x && l.x <= b.x + b.w && l.y >= b.y && l.y <= b.y + b.h) {
+                            b.hit();
+                            hit = true;
+                            break;
+                        }
+                    }
+                    if(hit || l.y < 0) {
+                        lasers.splice(i, 1);
+                    }
+                }
+
+                // Power-Ups update mapping array
+                for (let i = powerUps.length - 1; i >= 0; i--) {
+                    let p = powerUps[i];
+                    p.update();
+
+                    // Collision checking boundary system interception array mapping
+                    if (p.y + p.radius >= paddle.y && 
+                        p.y - p.radius <= paddle.y + paddle.height && 
+                        p.x >= paddle.x && p.x <= paddle.x + paddle.width) {
+                        handlePowerUp(p);
+                        powerUps.splice(i, 1);
+                    } else if (p.y - p.radius > canvas.height) {
+                        powerUps.splice(i, 1);
+                    }
+                }
+
+                // Check lifecycle statuses for active system nodes array counts
+                if (balls.length === 0) {
+                    lives--;
+                    updateHUD();
+                    screenShake = 15;
+                    if (lives <= 0) {
+                        state = 'GAMEOVER';
+                        finalScore.textContent = padZero(Math.floor(score), 5);
+                        finalLevel.textContent = currentLevel;
+                        gameOverScreen.classList.remove('hidden');
+                    } else {
+                        balls.push(new Ball());
+                        isBallAnchored = true;
+                    }
+                }
+
+                // Stage completion victory state triggers checker
+                if (bricks.every(b => b.destroyed)) {
+                    advanceLevel();
+                }
+
+                // Structural execution updates on visual particle cloud arrays
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    particles[i].update();
+                    if (particles[i].alpha <= 0) particles.splice(i, 1);
+                }
+
+                // RENDER PIPELINE STEP
+                bricks.forEach(b => b.draw());
+                powerUps.forEach(p => p.draw());
+                lasers.forEach(l => l.draw());
+                paddle.draw();
+                balls.forEach(b => b.draw());
+                particles.forEach(p => p.draw());
+            }
+
+            ctx.restore();
+            requestAnimationFrame(loop);
+        }
+
+        // System Input Binding Interceptors Tracking Interactivity Mapping
+        window.addEventListener('mousemove', (e) => {
+            let rect = canvas.getBoundingClientRect();
+            // Translate absolute coordinates to game coordinate space logic structures
+            mouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            mouse.y = (e.clientY - rect.top) * (canvas.height / rect.height);
+        });
+
+        // Touch device controller support routing pipeline
+        window.addEventListener('touchmove', (e) => {
+            if(e.touches.length > 0) {
+                let rect = canvas.getBoundingClientRect();
+                mouse.x = (e.touches[0].clientX - rect.left) * (canvas.width / rect.width);
+            }
+        }, { passive: true });
+
+        window.addEventListener('click', () => {
+            if (state === 'PLAYING' && isBallAnchored) {
+                balls[0].launch();
+                resetMultiplierTimer();
+            }
+        });
+
+        // UI Event Trigger Wire-up configurations
+        startBtn.addEventListener('click', () => {
+            startScreen.classList.add('hidden');
+            state = 'PLAYING';
+            initEngine();
+        });
+
+        restartBtn.addEventListener('click', () => {
+            gameOverScreen.classList.add('hidden');
+            state = 'PLAYING';
+            initEngine();
+        });
+
+        // Kickstart Background Async Engine Initialization Routines Loop execution
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>
